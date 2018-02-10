@@ -6,36 +6,53 @@ import sys
 
 class Node:
 
-    def __init__(self, word_id, gain, docs):
+    def __init__(self, word_id, entropy, docs, word_ids):
         self.word_id = word_id
-        self.gain = gain
+        self.entropy = entropy
         self.children = {}
         self.docs = docs
+        self.word_ids = word_ids
 
     def add_child(self, node, val):
         self.children[val] = node
 
+    def has_child(self, val):
+        return val in self.children
+
+    def get_split(self):
+        labels = defaultdict(int)
+        for d in self.docs:
+            labels[d.label] += 1
+        return labels
+
     def __cmp__(self, node):
-        if self.gain < node.gain:
+        if self.entropy < node.entropy:
             return -1
-        elif self.gain > node.gain:
+        elif self.entropy > node.entropy:
             return 1
         return 0
+
+    def __str__(self):
+        return str(self.word_id) + ' ' + str(self.entropy) + ' ' + 'docs: ' + str(len(self.docs)) + ' ' + 'word_ids: ' + str(self.word_ids)
 
 
 class Option:
 
-    def __init__(self, n1, n2):
+    def __init__(self, n1, n2, word_id, contains):
         self.n1 = n1
         self.n2 = n2
-        self.gain = information_gain(n1.docs, n2.word_id)
+        self.gain = information_gain(n2.docs, n2.word_id)
+        self.contains = contains
 
     def __cmp__(self, option):
         if self.gain < option.gain:
-            return -1
-        elif self.gain > option.gain:
             return 1
+        elif self.gain > option.gain:
+            return -1
         return 0
+
+    def __str__(self):
+        return str(self.n1.word_id) + ' ' + str(self.n2.word_id) + ' ' + str(self.gain) + ' ' + str(self.contains)
 
 
 class Doc:
@@ -124,6 +141,16 @@ def load_words(filename):
     return words
 
 
+def print_tree(node):
+    if False in node.children:
+        print_tree(node.children[False])
+
+    print(node.word_id, node.children, node.entropy, node.get_split())
+
+    if True in node.children:
+        print_tree(node.children[True])
+
+
 def main():
     docs = load_data('trainData.txt')
     docs = [docs[i] for i in docs]
@@ -131,18 +158,57 @@ def main():
     words = load_words('words.txt')
     pq = queue()
 
-    node_count = 0
     nodes = []
 
-    for i in range(0, len(words)):
-        pq.put(Node(information_gain(docs, i), i, docs))
+    root = Node(None, entropy(docs), docs, [])
+    for i in range(1, len(words)+1):
+        n = Node(i, entropy(docs), docs, [i])
+        pq.put(Option(root, n, n.word_id, True))
 
-    n = pq.get()
+    start = pq.get()
+    while not pq.empty():
+        try:
+            x = pq.get(False)
+            print(str(x), x.n2.get_split())
+        except:
+            continue
+        pq.task_done()
+
+    pq.put(start)
     nodes.append(n)
+    node_count = 1
 
-    while node_count < 100:
-        pass
-    print(pq)
+    while node_count < 10:
+        o = pq.get()
+        parent_parent_node = o.n1
+        parent_node = o.n2
+        if parent_parent_node.has_child(o.contains):
+            continue
+
+        print(str(parent_node))
+        print(str(o))
+        parent_parent_node.add_child(parent_node, o.contains)
+
+        has_word = []
+        missing_word = []
+        print('Parent node word id', parent_node.word_id)
+        for d in parent_node.docs:
+            if d.has_word(parent_node.word_id):
+                has_word.append(d)
+            else:
+                missing_word.append(d)
+
+        print('has word', len(has_word))
+        print('missing word', len(missing_word))
+        for word in range(1, len(words)+1):
+            if word not in parent_node.word_ids:
+                pq.put(Option(parent_node, Node(word, entropy(has_word), has_word, parent_node.word_ids + [word]), word, True))
+                pq.put(Option(parent_node, Node(word, entropy(missing_word), missing_word, parent_node.word_ids + [word]), word, False))
+
+        node_count += 1
+        print('')
+
+    print_tree(root)
 
     return 0
 
