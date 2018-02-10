@@ -3,15 +3,19 @@ from Queue import PriorityQueue as queue
 import math
 import sys
 
+RENDER = True
+
 
 class Node:
 
-    def __init__(self, word_id, entropy, docs, word_ids):
+    def __init__(self, word_id, docs, word_ids):
         self.word_id = word_id
-        self.entropy = entropy
+        self.entropy = entropy(docs)
         self.children = {}
         self.docs = docs
         self.word_ids = word_ids
+        self.info_gain = information_gain(self.docs, self.word_id)
+        self.split = self.get_split()
 
     def add_child(self, node, val):
         self.children[val] = node
@@ -19,11 +23,29 @@ class Node:
     def has_child(self, val):
         return val in self.children
 
+    def is_terminal(self):
+        # Checks if there are any empty
+        labels = self.split
+        if labels[True][1] + labels[True][2] == 0 or labels[False][1] + labels[False][2] == 0:
+            return True
+        return False
+
     def get_split(self):
-        labels = defaultdict(int)
+        labels = {}
+        labels[True] = defaultdict(int)
+        labels[False] = defaultdict(int)
+
         for d in self.docs:
-            labels[d.label] += 1
+            if d.has_word(self.word_id):
+                labels[True][d.label] += 1
+            else:
+                labels[False][d.label] += 1
+
         return labels
+
+    def format_split(self):
+        labels = self.split
+        return 'True-1: {} True-2: {} False-1: {} False-2: {}'.format(labels[True][1], labels[True][2], labels[False][1], labels[False][2])
 
     def __cmp__(self, node):
         if self.entropy < node.entropy:
@@ -33,7 +55,11 @@ class Node:
         return 0
 
     def __str__(self):
-        return str(self.word_id) + ' ' + str(self.entropy) + ' ' + 'docs: ' + str(len(self.docs)) + ' ' + 'word_ids: ' + str(self.word_ids)
+        return str(self.word_id) + ' ' + str(self.info_gain) + ' ' + 'docs: ' + str(len(self.docs)) + ' ' + 'word_ids: ' + str(self.word_ids)
+
+    def get_id(self):
+        word_ids = map(str, self.word_ids)
+        return '-'.join(word_ids)
 
 
 class Option:
@@ -85,7 +111,7 @@ def entropy(docs):
     return s
 
 
-def information_gain(docs, word_id, approach=1):
+def information_gain(docs, word_id, approach=2):
     has_word = []
     missing_word = []
     for doc in docs:
@@ -145,10 +171,31 @@ def print_tree(node):
     if False in node.children:
         print_tree(node.children[False])
 
-    print(node.word_id, node.children, node.entropy, node.get_split())
+    print(node.word_id, node.entropy, node.format_split())
 
     if True in node.children:
         print_tree(node.children[True])
+
+
+def render_tree(node):
+    global RENDER
+    if not RENDER:
+        return
+    from graphviz import Digraph  # TODO:
+    dot = Digraph()
+    register_node(dot, node)
+    dot.render('decision-tree.gv', view=True)
+
+
+def register_node(dot, node):
+    dot.node(node.get_id(), str(node.word_id) + '_' + str(node.entropy) + '_' + str(node.info_gain))
+    if True in node.children:
+        dot.edge(node.get_id(), node.children[True].get_id())
+        register_node(dot, node.children[True])
+
+    if False in node.children:
+        dot.edge(node.get_id(), node.children[False].get_id())
+        register_node(dot, node.children[False])
 
 
 def main():
@@ -160,16 +207,16 @@ def main():
 
     nodes = []
 
-    root = Node(None, entropy(docs), docs, [])
+    root = Node(None, docs, [])
     for i in range(1, len(words)+1):
-        n = Node(i, entropy(docs), docs, [i])
+        n = Node(i, docs, [i])
         pq.put(Option(root, n, n.word_id, True))
 
     start = pq.get()
     while not pq.empty():
         try:
             x = pq.get(False)
-            print(str(x), x.n2.get_split())
+            print(str(x), x.n2.format_split())
         except:
             continue
         pq.task_done()
@@ -178,14 +225,14 @@ def main():
     nodes.append(n)
     node_count = 1
 
-    while node_count < 10:
+    while node_count < 100:
         o = pq.get()
         parent_parent_node = o.n1
         parent_node = o.n2
-        if parent_parent_node.has_child(o.contains):
+        if parent_parent_node.has_child(o.contains) or parent_node.is_terminal():
             continue
 
-        print(str(parent_node))
+        print(str(parent_node), parent_node.format_split())
         print(str(o))
         parent_parent_node.add_child(parent_node, o.contains)
 
@@ -198,17 +245,19 @@ def main():
             else:
                 missing_word.append(d)
 
-        print('has word', len(has_word))
-        print('missing word', len(missing_word))
         for word in range(1, len(words)+1):
             if word not in parent_node.word_ids:
-                pq.put(Option(parent_node, Node(word, entropy(has_word), has_word, parent_node.word_ids + [word]), word, True))
-                pq.put(Option(parent_node, Node(word, entropy(missing_word), missing_word, parent_node.word_ids + [word]), word, False))
+                o1 = Option(parent_node, Node(word, has_word, parent_node.word_ids + [word]), word, True)
+                pq.put(o1)
+
+                o2 = Option(parent_node, Node(word, missing_word, parent_node.word_ids + [word]), word, False)
+                pq.put(o2)
 
         node_count += 1
         print('')
 
     print_tree(root)
+    render_tree(root)
 
     return 0
 
