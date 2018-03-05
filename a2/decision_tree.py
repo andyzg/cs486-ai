@@ -1,21 +1,29 @@
 from collections import defaultdict
 from Queue import PriorityQueue as queue
 import math
-import sys
+
+AVERAGE_INFO_GAIN = 1
+WEIGHTED_INFO_GAIN = 2
+APPROACH = WEIGHTED_INFO_GAIN
 
 RENDER = True
 
 
 class Node:
 
-    def __init__(self, word_id, docs, word_ids):
+    def __init__(self, word_id, docs, word_ids, is_terminal=False, contains=None):
         self.word_id = word_id
         self.entropy = entropy(docs)
         self.children = {}
         self.docs = docs
         self.word_ids = word_ids
-        self.info_gain = information_gain(self.docs, self.word_id)
+        if is_terminal:
+            self.info_gain = 0.0
+        else:
+            self.info_gain = information_gain(self.docs, self.word_id)
         self.split = self.get_split()
+        self.contains = contains
+        self.is_terminal = is_terminal
 
     def add_child(self, node, val):
         self.children[val] = node
@@ -23,7 +31,10 @@ class Node:
     def has_child(self, val):
         return val in self.children
 
-    def is_terminal(self):
+    def child_count(self):
+        return len(self.children)
+
+    def is_end(self):
         # Checks if there are any empty
         labels = self.split
         if labels[True][1] + labels[True][2] == 0 or labels[False][1] + labels[False][2] == 0:
@@ -59,6 +70,8 @@ class Node:
 
     def get_id(self):
         word_ids = map(str, self.word_ids)
+        if self.is_terminal:
+            return str(self.contains) + '-' + '-'.join(word_ids)
         return '-'.join(word_ids)
 
 
@@ -97,6 +110,15 @@ class Doc:
     def has_word(self, word_id):
         return self.words[word_id]
 
+    def get_label(self, node):
+        has_word = self.has_word(node.word_id)
+        if node.has_child(has_word):
+            return self.get_label(node.children[has_word])
+        if node.split[has_word][1] > node.split[has_word][2]:
+            return 1
+        else:
+            return 2
+
 
 def entropy(docs):
     count = defaultdict(int)
@@ -111,7 +133,7 @@ def entropy(docs):
     return s
 
 
-def information_gain(docs, word_id, approach=2):
+def information_gain(docs, word_id):
     has_word = []
     missing_word = []
     for doc in docs:
@@ -123,12 +145,12 @@ def information_gain(docs, word_id, approach=2):
     has_word_entropy = entropy(has_word)
     missing_word_entropy = entropy(missing_word)
 
-    if approach == 2:
+    if APPROACH == 2:
         return entropy(docs) - \
             (1.0 * len(has_word) / len(docs) * has_word_entropy +
              1.0 * len(missing_word) / len(docs) * missing_word_entropy)
-
-    return entropy(docs) - (0.5 * has_word_entropy + 0.5 * missing_word_entropy)
+    else:
+        return entropy(docs) - (0.5 * has_word_entropy + 0.5 * missing_word_entropy)
 
 
 def load_data(filename):
@@ -167,45 +189,70 @@ def load_words(filename):
     return words
 
 
-def print_tree(node):
-    if False in node.children:
-        print_tree(node.children[False])
-
-    print(node.word_id, node.entropy, node.format_split())
-
-    if True in node.children:
-        print_tree(node.children[True])
-
-
-def render_tree(node):
+def render_tree(node, words):
     global RENDER
     if not RENDER:
         return
-    from graphviz import Digraph  # TODO:
+    from graphviz import Digraph
     dot = Digraph()
-    register_node(dot, node)
+    register_node(dot, node, words)
     dot.render('decision-tree.gv', view=True)
 
 
-def register_node(dot, node):
-    dot.node(node.get_id(), str(node.word_id) + '_' + str(node.entropy) + '_' + str(node.info_gain))
+def register_node(dot, node, words):
+    if node.is_terminal:
+        label = 1
+        if node.split[node.contains][2] > node.split[node.contains][1]:
+            label = 2
+        dot.node(node.get_id(), str(label))
+    else:
+        dot.node(node.get_id(), str(words[node.word_id]) + ', info gain: ' + str(node.info_gain)[0:6])
+
     if True in node.children:
-        dot.edge(node.get_id(), node.children[True].get_id())
-        register_node(dot, node.children[True])
+        dot.edge(node.get_id(), node.children[True].get_id(), label='Contains')
+        register_node(dot, node.children[True], words)
 
     if False in node.children:
-        dot.edge(node.get_id(), node.children[False].get_id())
-        register_node(dot, node.children[False])
+        dot.edge(node.get_id(), node.children[False].get_id(), label='Not contains')
+        register_node(dot, node.children[False], words)
 
 
-def main():
+def fill_single_childs(node):
+    print(node.get_id())
+    if node.has_child(True):
+        fill_single_childs(node.children[True])
+    if node.has_child(False):
+        fill_single_childs(node.children[False])
+
+    print(node.child_count())
+    if node.child_count() == 2:
+        return
+    is_true = node.has_child(True)
+
+    has_word = []
+    missing_word = []
+    for d in node.docs:
+        if d.has_word(node.word_id):
+            has_word.append(d)
+        else:
+            missing_word.append(d)
+
+    if node.child_count() == 1:
+        if is_true:
+            node.add_child(Node(node.word_id, missing_word, node.word_ids, True, False), False)
+        else:
+            node.add_child(Node(node.word_id, has_word, node.word_ids, True, True), True)
+    else:
+        node.add_child(Node(node.word_id, missing_word, node.word_ids, True, False), False)
+        node.add_child(Node(node.word_id, has_word, node.word_ids, True, True), True)
+
+
+def create_tree():
     docs = load_data('trainData.txt')
     docs = [docs[i] for i in docs]
     load_labels(docs, 'trainLabel.txt')
     words = load_words('words.txt')
     pq = queue()
-
-    nodes = []
 
     root = Node(None, docs, [])
     for i in range(1, len(words)+1):
@@ -215,26 +262,25 @@ def main():
     start = pq.get()
     while not pq.empty():
         try:
-            x = pq.get(False)
-            print(str(x), x.n2.format_split())
+            pq.get(False)
         except:
             continue
         pq.task_done()
 
     pq.put(start)
-    nodes.append(n)
     node_count = 1
 
-    while node_count < 100:
+    while node_count < 200:
         o = pq.get()
         parent_parent_node = o.n1
         parent_node = o.n2
-        if parent_parent_node.has_child(o.contains) or parent_node.is_terminal():
+        if parent_parent_node.has_child(o.contains) or parent_node.is_end():
             continue
 
         print(str(parent_node), parent_node.format_split())
         print(str(o))
         parent_parent_node.add_child(parent_node, o.contains)
+        node_count += 2
 
         has_word = []
         missing_word = []
@@ -247,20 +293,41 @@ def main():
 
         for word in range(1, len(words)+1):
             if word not in parent_node.word_ids:
-                o1 = Option(parent_node, Node(word, has_word, parent_node.word_ids + [word]), word, True)
+                n1 = Node(word, has_word, parent_node.word_ids + [word])
+                o1 = Option(parent_node, n1, word, True)
                 pq.put(o1)
 
-                o2 = Option(parent_node, Node(word, missing_word, parent_node.word_ids + [word]), word, False)
+                n2 = Node(word, missing_word, parent_node.word_ids + [word])
+                o2 = Option(parent_node, n2, word, False)
                 pq.put(o2)
 
-        node_count += 1
         print('')
 
-    print_tree(root)
-    render_tree(root)
+    fill_single_childs(root.children[True])
 
-    return 0
+    render_tree(root.children[True], words)
 
+    return root.children[True]
+
+
+def load_test_label(filename):
+    label = []
+    with open(filename, 'r') as f:
+        for i, line in enumerate(f.readlines()):
+            label.append(int(line.strip()))
+    return label
+
+
+def test_tree(root):
+    correct = 0
+    data = load_data('testData.txt')
+    label = load_test_label('testLabel.txt')
+    for i in range(1, len(label)+1):
+        predicted_label = data[i].get_label(root)
+        if predicted_label == label[i-1]:
+            correct += 1
+    print('Accuracy: ' + str(correct * 1.0 / len(label)))
 
 if __name__ == '__main__':
-    sys.exit(main())
+    tree = create_tree()
+    test_tree(tree)
