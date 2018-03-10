@@ -25,11 +25,18 @@ def unique(l):
     return list(output)
 
 
+def print_factors(factorList):
+    for f in factorList:
+        print f.dtype.names, f.view((float, len(f.dtype.names)))
+
+
 def restrict(factor, variable, value):
     """Factor out rows where variable is not value, and then remove variable column.
 
     factor is a structuredarray
     """
+    if variable not in factor.dtype.names:
+        return factor
     indices = np.where(factor[variable] != value)
     result = np.delete(factor, indices, axis=0)  # Delete rows
     return remove_field_name(result, variable)
@@ -67,7 +74,8 @@ def multiply(factor1, factor2):
                 # Each permutation for each column where col == v
                 rows.append(t1[0:-1] + [v] + t2[0:-1] + [t1[-1] * t2[-1]])
 
-    return to_structured_array(np.array(rows), new_col)
+    result = to_structured_array(np.array(rows), new_col)
+    return result
 
 
 def sumout(factor, variable):
@@ -90,11 +98,39 @@ def sumout(factor, variable):
 
 
 def normalize(factor):
-    pass
+    s = np.sum(factor['val'])
+    factor['val'] /= s
+    return factor
 
 
 def inference(factorList, queryVariables, orderedListOfHiddenVariables, evidenceList):
-    pass
+    """
+    evidenceList: dict where key is variable name and value is the value.
+    """
+    for var in evidenceList:
+        for i, factor in enumerate(factorList):
+            factorList[i] = restrict(factor, var, evidenceList[var])
+
+    for var in orderedListOfHiddenVariables:
+        to_multiply = []
+        for i, factor in reversed(list(enumerate(factorList))):
+            if var in factor.dtype.names:
+                f = factorList.pop(i)
+                to_multiply.append(f)
+
+        product = to_multiply[0]
+        for i in range(1, len(to_multiply)):
+            product = multiply(product, to_multiply[i])
+
+        f = sumout(product, var)
+        factorList.append(f)
+
+    print_factors(factorList)
+    product = factorList[0]
+    for i in range(1, len(factorList)):
+        product = multiply(product, factorList[i])
+
+    return normalize(product)
 
 
 # Test restrict
@@ -127,4 +163,32 @@ s = np.array([[1,1,1,.03],
              [0,1,0,.14],
              [0,0,1,.48],
              [0,0,0,.32]])
-print(sumout(to_structured_array(s, 'a,b,c,val'), 'b'))
+# print(sumout(to_structured_array(s, 'a,b,c,val'), 'b'))
+# print(normalize(to_structured_array(f1, 'a,b,val')))
+
+M = to_structured_array(np.array([[0,.92], [1,.08]]), 'malfunction,val')
+
+C = to_structured_array(np.array([[0,.68], [1,.32]]), 'cancer,val')
+
+ta = to_structured_array(np.array([[1,1,.8], [1,0,.2], [0,1,.15], [0,0,.85]]), 'cancer,test a,val')
+
+
+tb = to_structured_array(np.array([[1,1,1,.61],
+                         [1,1,0,.39],
+                         [1,0,1,.52],
+                         [1,0,0,.48],
+                         [0,1,1,.78],
+                         [0,1,0,.22],
+                         [0,0,1,.044],
+                         [0,0,0,.956]]), 'malfunction,cancer,test b,val')
+
+r = to_structured_array(np.array([[1,1,.98], [1,0,.02], [0,1,.01], [0,0,.99]]), 'test b,report,val')
+
+d = to_structured_array(np.array([[1,1,.96],
+                        [1,0,.04],
+                        [0,1,.001],
+                        [0,0,.999]]), 'report,database,val')
+
+
+factorList = [M, C, ta, tb, r, d]
+print(inference(factorList, 'database', ['cancer', 'malfunction', 'test a', 'test b', 'report'], {}))
