@@ -1,4 +1,6 @@
 from collections import defaultdict
+from Queue import PriorityQueue as queue
+import math
 
 
 class Doc:
@@ -16,6 +18,20 @@ class Doc:
 
     def has_word(self, word_id):
         return self.words[word_id]
+
+
+class Score:
+
+    def __init__(self, score, word_id):
+        self.word_id = word_id
+        self.score = score
+
+    def __cmp__(self, score):
+        if self.score > score.score:
+            return -1
+        elif self.score < score.score:
+            return 1
+        return 0
 
 
 def load_data(filename):
@@ -105,26 +121,75 @@ def get_label(doc, probs):
     return max_id
 
 
-def main():
+def get_training_docs():
     docs = load_data('datasets/trainData.txt')
     load_labels(docs, 'datasets/trainLabel.txt')
-    words = load_words('datasets/words.txt')
 
     # Split by label
     split_docs = split_by_label(docs)
 
-    # Probabilities for each word
-    prob = probabilities(split_docs, words)
+    return split_docs
 
+
+def part1():
+    docs = get_training_docs()
+    words = load_words('datasets/words.txt')
+
+    # Probabilities for each word
+    prob = probabilities(docs, words)
+
+    # Classifying testData.txt
     test_docs = load_data('datasets/testData.txt')
     load_labels(test_docs, 'datasets/testLabel.txt')
+
     split = defaultdict(int)
     for doc_id in test_docs:
         label = get_label(test_docs[doc_id], prob)
-        print label == test_docs[doc_id].label
         split[label == test_docs[doc_id].label] += 1
 
-    print split
+    print "Testing accuracy: "
+    print "{:10.4f}%".format(split[True] / float(len(test_docs)) * 100)
+    print ""
+
+    # Classifying trainData.txt
+    test_docs = load_data('datasets/trainData.txt')
+    load_labels(test_docs, 'datasets/trainLabel.txt')
+
+    split = defaultdict(int)
+    for doc_id in test_docs:
+        label = get_label(test_docs[doc_id], prob)
+        split[label == test_docs[doc_id].label] += 1
+
+    print "Training accuracy: "
+    print "{:10.4f}%".format(split[True] / float(len(test_docs)) * 100)
+
+
+def discrimanitive_score(prob):
+    return math.fabs(math.log(prob[1]) - math.log(prob[2]))
+
+
+def part2():
+    docs = get_training_docs()
+    words = load_words('datasets/words.txt')
+
+    pq = queue()
+    for i, word in enumerate(words):
+        prob = {}
+        for label in docs:
+            split = defaultdict(int)
+            for d in docs[label]:
+                split[d.has_word(i)] += 1
+            prob[label] = (split[True]+1) / float(len(docs[label]) + 2)
+        score = discrimanitive_score(prob)
+        pq.put(Score(score, i))
+
+    print ""
+    print "Discriminative words: "
+    for i in range(0, 10):
+        s = pq.get(False)
+        print words[s.word_id], s.score
+
 
 if __name__ == '__main__':
-    main()
+    part1()
+    part2()
