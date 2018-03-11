@@ -43,6 +43,7 @@ def restrict(factor, variable, value):
 
 
 def multiply(factor1, factor2):
+    print(factor1.dtype.names, factor2.dtype.names)
     names = set(factor1.dtype.names).intersection(set(factor2.dtype.names))
     names.remove('val')  # Don't need 'val'
 
@@ -192,3 +193,63 @@ d = to_structured_array(np.array([[1,1,.96],
 
 factorList = [M, C, ta, tb, r, d]
 print(inference(factorList, 'database', ['cancer', 'malfunction', 'test a', 'test b', 'report'], {}))
+
+###########################################
+
+
+# Pr(OC)
+f0 = np.array([0.2,0.8])
+f0 = f0.reshape(2,1,1,1,1,1)
+print ("Pr(OC)={}\n".format(np.squeeze(f0)))
+f0 = to_structured_array(np.array([[0,.2], [1,.8]]), 'OC,val')
+
+# Pr(Trav)
+f1 = np.array([0.95, 0.05])
+f1 = f1.reshape(1,2,1,1,1,1)
+print ("Pr(Trav)={}\n".format(np.squeeze(f1)))
+f1 = to_structured_array(np.array([[0,.95], [1,.05]]), 'Trav,val')
+
+# Pr(Fraud|Trav)
+f2 = np.array([[0.996,0.004],[0.99,0.01]])
+f2 = f2.reshape(1,2,2,1,1,1)
+print ("Pr(Fraud|Trav)={}\n".format(np.squeeze(f2)))
+f2 = to_structured_array(np.array([[1,1,.99], [1,0,.01], [0,1,.004], [0,0,.996]]), 'Trav,Fraud,val')
+
+# Pr(FP|Fraud,Trav)
+f3 = np.array([[[0.99, 0.01],[0.9,0.1]],[[0.1,0.9],[0.1,0.9]]])
+f3 = f3.reshape(1,2,2,2,1,1)
+print ("Pr(FP|Fraud,Trav)={}\n".format(np.squeeze(f3)))
+f3 = to_structured_array(np.array([[1,1,1,.1],
+                         [1,1,0,.9],
+                         [1,0,1,.1],
+                         [1,0,0,.9],
+                         [0,1,1,.9],
+                         [0,1,0,.1],
+                         [0,0,1,.01],
+                         [0,0,0,.99]]), 'Fraud,Trav,FP,val')
+
+# Pr(IP|OC,Fraud)
+f4 = np.array([[[0.999, 0.001],[0.949,0.051]],[[0.9,0.1],[0.85,0.15]]])
+f4 = f4.reshape(2,1,2,1,2,1)
+print ("Pr(IP|OC,Fraud)={}\n".format(np.squeeze(f4)))
+f4 = to_structured_array(np.array([[1,1,1,.15],
+                         [1,1,0,.85],
+                         [1,0,1,.1],
+                         [1,0,0,.9],
+                         [0,1,1,.051],
+                         [0,1,0,.949],
+                         [0,0,1,.001],
+                         [0,0,0,.999]]), 'OC,Fraud,IP,val')
+
+# Pr(CRP|OC)
+f5 = np.array([[0.99,0.01],[0.9,0.1]])
+f5 = f5.reshape(2,1,1,1,1,2)
+print ("Pr(CRP|OC)={}\n".format(np.squeeze(f5)))
+f5 = to_structured_array(np.array([[1,1,.1], [1,0,.9], [0,1,.01], [0,0,.99]]), 'OC,CRP,val')
+
+
+# Pr(Fraud)
+print "2b) Pr(Fraud)\n"
+factorList = [f0, f1, f2, f3, f4, f5]
+f6 = inference(factorList,'Fraud',['Trav', 'FP', 'IP', 'OC', 'CRP'],{})
+print ("Pr(Fraud)={}\n".format(f6))
