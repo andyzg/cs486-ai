@@ -1,6 +1,12 @@
 import numpy as np
 
 
+def fields_view(array, fields):
+    return array.getfield(np.dtype(
+        {name: array.dtype.fields[name] for name in fields}
+    ))
+
+
 def remove_field_name(a, names):
     """Removes a field name of a structuredarray `a`."""
     if type(names) == str:
@@ -39,41 +45,57 @@ def restrict(factor, variable, value):
         return factor
     indices = np.where(factor[variable] != value)
     result = np.delete(factor, indices, axis=0)  # Delete rows
-    return remove_field_name(result, variable)
+    temp = remove_field_name(result, variable)
+    return to_structured_array(np.array(temp.tolist()), ','.join(temp.dtype.names))
 
 
 def multiply(factor1, factor2):
-    print(factor1.dtype.names, factor2.dtype.names)
+    if len(factor1.dtype.names) == 1:
+        factor2['val'] *= factor1[factor1.dtype.names[0]][0]
+        return factor2
+    elif len(factor2.dtype.names) == 1:
+        factor1['val'] *= factor2[factor2.dtype.names[0]][0]
+        return factor1
+
     names = set(factor1.dtype.names).intersection(set(factor2.dtype.names))
     names.remove('val')  # Don't need 'val'
 
     # Let's assume that names is only 1 value now
-    col = list(names)[0]
-    vals = unique(factor2[col])
+    col = list(names)
+    vals = fields_view(factor2, list(col))
 
     # Merge columns
     f1_names = list(factor1.dtype.names)
     f2_names = list(factor2.dtype.names)
-    f1_names.remove(col)
+    for name in col:
+        f1_names.remove(name)
+        f2_names.remove(name)
     f1_names.remove('val')
-    f2_names.remove(col)
     f2_names.remove('val')
-    new_col = f1_names + [col] + f2_names + ['val']
+    new_col = f1_names + col + f2_names + ['val']
 
-    temp1 = remove_field_name(factor1, col)
-    temp2 = remove_field_name(factor2, col)
+    temp1 = factor1
+    temp2 = factor2
+    for name in col:
+        temp1 = remove_field_name(temp1, name)
+        temp2 = remove_field_name(temp2, name)
 
     rows = []
     for v in vals:
-        row1 = np.where(factor1[col] == v)[0]
-        row2 = np.where(factor2[col] == v)[0]
+        row1 = []
+        row2 = []
+        for i, c in enumerate(col):
+            row1.append(np.array(np.where(factor1[c] == v[i])[0]))
+            row2.append(np.array(np.where(factor2[c] == v[i])[0]))
+        row1 = reduce(np.intersect1d, np.array(row1))
+        row2 = reduce(np.intersect1d, np.array(row2))
 
         for i in row1:
             for j in row2:
                 t1 = list(temp1[i])
                 t2 = list(temp2[j])
                 # Each permutation for each column where col == v
-                rows.append(t1[0:-1] + [v] + t2[0:-1] + [t1[-1] * t2[-1]])
+                rows.append(t1[0:-1] + list(v) + t2[0:-1] + [t1[-1] * t2[-1]])
 
     result = to_structured_array(np.array(rows), new_col)
     return result
@@ -112,6 +134,8 @@ def inference(factorList, queryVariables, orderedListOfHiddenVariables, evidence
         for i, factor in enumerate(factorList):
             factorList[i] = restrict(factor, var, evidenceList[var])
 
+    # print_factors(factorList)
+
     for var in orderedListOfHiddenVariables:
         to_multiply = []
         for i, factor in reversed(list(enumerate(factorList))):
@@ -126,7 +150,7 @@ def inference(factorList, queryVariables, orderedListOfHiddenVariables, evidence
         f = sumout(product, var)
         factorList.append(f)
 
-    print_factors(factorList)
+    # print_factors(factorList)
     product = factorList[0]
     for i in range(1, len(factorList)):
         product = multiply(product, factorList[i])
@@ -192,7 +216,7 @@ d = to_structured_array(np.array([[1,1,.96],
 
 
 factorList = [M, C, ta, tb, r, d]
-print(inference(factorList, 'database', ['cancer', 'malfunction', 'test a', 'test b', 'report'], {}))
+# print(inference(factorList, 'database', ['cancer', 'malfunction', 'test a', 'test b', 'report'], {}))
 
 ###########################################
 
@@ -213,14 +237,14 @@ f1 = to_structured_array(np.array([[0,.95], [1,.05]]), 'Trav,val')
 f2 = np.array([[0.996,0.004],[0.99,0.01]])
 f2 = f2.reshape(1,2,2,1,1,1)
 print ("Pr(Fraud|Trav)={}\n".format(np.squeeze(f2)))
-f2 = to_structured_array(np.array([[1,1,.99], [1,0,.01], [0,1,.004], [0,0,.996]]), 'Trav,Fraud,val')
+f2 = to_structured_array(np.array([[1,0,.99], [1,1,.01], [0,1,.004], [0,0,.996]]), 'Trav,Fraud,val')
 
 # Pr(FP|Fraud,Trav)
 f3 = np.array([[[0.99, 0.01],[0.9,0.1]],[[0.1,0.9],[0.1,0.9]]])
 f3 = f3.reshape(1,2,2,2,1,1)
 print ("Pr(FP|Fraud,Trav)={}\n".format(np.squeeze(f3)))
-f3 = to_structured_array(np.array([[1,1,1,.1],
-                         [1,1,0,.9],
+f3 = to_structured_array(np.array([[1,1,1,.9],
+                         [1,1,0,.1],
                          [1,0,1,.1],
                          [1,0,0,.9],
                          [0,1,1,.9],
@@ -253,3 +277,23 @@ print "2b) Pr(Fraud)\n"
 factorList = [f0, f1, f2, f3, f4, f5]
 f6 = inference(factorList,'Fraud',['Trav', 'FP', 'IP', 'OC', 'CRP'],{})
 print ("Pr(Fraud)={}\n".format(f6))
+
+print "2b) Pr(Fraud|FP,~IP,CRP)\n"
+factorList = [f0, f1, f2, f3, f4, f5]
+f7 = inference(factorList,'Fraud',['Trav','OC'],{'FP': 1,'IP':0,'CRP':1})
+print ("Pr(Fraud|FP,~IP,CRP)={}\n".format(f7))
+
+print "2c) Pr(Fraud|FP,~IP,CRP,Trav))\n"
+factorList = [f0, f1, f2, f3, f4, f5]
+f8 = inference(factorList,'Fraud',['OC'],{'FP':1,'IP':0,'CRP':1,'Trav':1})
+print ("Pr(Fraud|FP,~IP,CRP,Trav)={}\n".format(f8))
+
+print "2d) Pr(Fraud|IP)\n"
+factorList = [f0, f1, f2, f3, f4, f5]
+f9 = inference(factorList,'Fraud',['Trav','FP','OC','CRP'],{'IP':1})
+print ("Pr(Fraud|IP)={}\n".format(f9))
+
+print "2d) Pr(Fraud|IP,CRP)\n"
+factorList = [f0, f1, f2, f3, f4, f5]
+f10 = inference(factorList,'Fraud',['Trav','FP','OC'],{'IP':1,'CRP':1})
+print ("Pr(Fraud|IP,CRP)={}\n".format(f10))
