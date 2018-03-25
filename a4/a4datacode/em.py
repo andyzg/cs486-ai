@@ -52,52 +52,45 @@ def main():
 
 
 # Pr(Dunnetts)
-f0 = to_structured_array(np.array([['absent',.5],
-                                  ['mild',.25],
-                                  ['severe',.25]]), 'dunnetts,val')
+f0 = to_structured_array(np.array([[0,.5],
+                                  [1,.25],
+                                  [2,.25]]), 'dunnetts,val')
 
 # Pr(Trimono)
 f1 = to_structured_array(np.array([[0,.9], [1,.1]]), 'trimono,val')
 
 # Pr(foriennditis|dunnetts)
-f2 = to_structured_array(np.array([['absent',0,.99],
-                                   ['absent',1,.01],
-                                   ['mild',0,.7],
-                                   ['mild',1,.3],
-                                   ['severe',0,.2],
-                                   ['severe',1,.8]]),
+f2 = to_structured_array(np.array([[0,0,.99],
+                                   [0,1,.01],
+                                   [1,0,.7],
+                                   [1,1,.3],
+                                   [2,0,.2],
+                                   [2,1,.8]]),
                          'dunnetts,foriennditis,val')
 
 # Pr(foriennditis|dunnetts)
-f3 = to_structured_array(np.array([['absent',0,.99],
-                                   ['absent',1,.01],
-                                   ['mild',0,.3],
-                                   ['mild',1,.8],
-                                   ['severe',0,.7],
-                                   ['severe',1,.3]]),
+f3 = to_structured_array(np.array([[0,0,.99],
+                                   [0,1,.01],
+                                   [1,0,.3],
+                                   [1,1,.8],
+                                   [2,0,.7],
+                                   [2,1,.3]]),
                          'dunnetts,degar,val')
 
 # Pr(foriennditis|dunnetts)
-f4 = to_structured_array(np.array([['absent',0,0,.99],
-                                   ['absent',0,1,.01],
-                                   ['absent',1,0,.999],
-                                   ['absent',1,1,.001],
-                                   ['mild',0,0,.5],
-                                   ['mild',0,1,.5],
-                                   ['mild',1,0,.95],
-                                   ['mild',1,1,.05],
-                                   ['severe',0,0,.5],
-                                   ['severe',0,1,.5],
-                                   ['severe',1,0,.95],
-                                   ['severe',1,1,.05]]),
+f4 = to_structured_array(np.array([[0,0,0,.99],
+                                   [0,0,1,.01],
+                                   [0,1,0,.999],
+                                   [0,1,1,.001],
+                                   [1,0,0,.5],
+                                   [1,0,1,.5],
+                                   [1,1,0,.95],
+                                   [1,1,1,.05],
+                                   [2,0,0,.5],
+                                   [2,0,1,.5],
+                                   [2,1,0,.95],
+                                   [2,1,1,.05]]),
                          'dunnetts,trimono,sloepnea,val')
-
-
-# Pr(Fraud|Trav)
-f5 = to_structured_array(np.array([[1,0,.99], [1,1,.01], [0,1,.004], [0,0,.996]]), 'Trav,Fraud,val')
-
-# Pr(Fraud|Trav)
-f6 = to_structured_array(np.array([[1,0,.99], [1,1,.01], [0,1,.004], [0,0,.996]]), 'Trav,Fraud,val')
 
 if __name__ == '__main__':
     main()
