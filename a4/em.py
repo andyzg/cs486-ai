@@ -1,5 +1,6 @@
 from bn import *
 import json
+import random
 
 NOT_RECORDED = -1
 NOT_PRESENT = 0
@@ -64,6 +65,16 @@ values = {
     'dunnetts': [0, 1, 2]
 }
 
+DEBUG = True
+
+
+def rand(delta):
+    return random.random() * delta
+
+def debug(*args):
+    if DEBUG:
+        print(*args)
+
 
 class Case:
 
@@ -72,7 +83,7 @@ class Case:
         self.foriennditis = fori
         self.degar_spots = dega
         self.trimono = trimo
-        self.dunnetts = dunn
+        self.dunn = dunn
 
     @property
     def s(self):
@@ -92,7 +103,7 @@ class Case:
 
     @property
     def dunnetts(self):
-        return self.dunnetts
+        return self.dunn
 
 
 class Parameter:
@@ -206,15 +217,16 @@ def expectation(cpts, parameters, data):
             prob[d.dunnetts] = 0.000001
         # print prob
         outcomes.append(prob)
-    print 'ABSENT: ', len(data) - count - count2, ' / ', len(data)
-    print 'MILD: ', count, ' / ', len(data)
-    print 'SEVERE: ', count2, ' / ', len(data)
+    # debug('ABSENT: ', len(data) - count - count2, ' / ', len(data))
+    # debug('MILD: ', count, ' / ', len(data))
+    # debug('SEVERE: ', count2, ' / ', len(data))
 
     return s, outcomes
 
 
-def maximization(data, outcomes):
+def maximization(data, outcomes, delta):
     total = len(outcomes) * 1.0
+    total = 0
 
     absent = 0.0
     mild = 0.0
@@ -224,18 +236,25 @@ def maximization(data, outcomes):
         absent += row.get(0, 0)
         mild += row.get(1, 0)
         severe += row.get(2, 0)
-    print absent, mild, severe
-    cpts['dunnetts']['val'][0] = absent / total
-    cpts['dunnetts']['val'][1] = mild / total
-    cpts['dunnetts']['val'][2] = severe / total
+    total = (absent + mild + severe)
+    absent += rand(delta)
+    mild += rand(delta)
+    severe += rand(delta)
+    dunn_total = absent + mild + severe
+    cpts['dunnetts']['val'][0] = absent / dunn_total
+    cpts['dunnetts']['val'][1] = mild / dunn_total
+    cpts['dunnetts']['val'][2] = severe / dunn_total
 
     trimono = 0.0
     # Set up trimono table
-    for d in data:
-        if d.t == 1:
-            trimono += 1.0
-    cpts['trimono']['val'][0] = 1 - trimono / total
-    cpts['trimono']['val'][1] = trimono / total
+    for i, row in enumerate(outcomes):
+        if data[i].t == 1:
+            trimono += (row.get(0, 0) + row.get(1, 0) + row.get(2, 0))
+    t_s = 1 - trimono / total + rand(delta)
+    t_t = rand(delta) + trimono
+
+    cpts['trimono']['val'][0] = t_s / (t_t + t_s)
+    cpts['trimono']['val'][1] = t_t / (t_t + t_s)
 
     absent = 0.0
     mild = 0.0
@@ -246,12 +265,20 @@ def maximization(data, outcomes):
             absent += row.get(0, 0)
             mild += row.get(1, 0)
             severe += row.get(2, 0)
-    cpts['foriennditis']['val'][0] = 1 - absent / total
-    cpts['foriennditis']['val'][1] = absent / total
-    cpts['foriennditis']['val'][2] = 1 - mild / total
-    cpts['foriennditis']['val'][3] = mild / total
-    cpts['foriennditis']['val'][4] = 1 - severe / total
-    cpts['foriennditis']['val'][5] = severe / total
+    fore_total = total + delta * 2
+    a_s = 1 - absent / total + rand(delta)
+    a_a = absent + rand(delta)
+    m_s = 1 - mild / total + rand(delta)
+    m_a = mild + rand(delta)
+    s_s = 1 - severe / total + rand(delta)
+    s_a = severe + rand(delta)
+
+    cpts['foriennditis']['val'][0] = a_s / (a_s + a_a)
+    cpts['foriennditis']['val'][1] = a_a / (a_s + a_a)
+    cpts['foriennditis']['val'][2] = m_s / (m_s + m_a)
+    cpts['foriennditis']['val'][3] = m_a / (m_s + m_a)
+    cpts['foriennditis']['val'][4] = s_s / (s_s + s_a)
+    cpts['foriennditis']['val'][5] = s_a / (s_s + s_a)
 
     absent = 0.0
     mild = 0.0
@@ -262,12 +289,18 @@ def maximization(data, outcomes):
             absent += row.get(0, 0)
             mild += row.get(1, 0)
             severe += row.get(2, 0)
-    cpts['degar']['val'][0] = 1 - absent / total
-    cpts['degar']['val'][1] = absent / total
-    cpts['degar']['val'][2] = 1 - mild / total
-    cpts['degar']['val'][3] = mild / total
-    cpts['degar']['val'][4] = 1 - severe / total
-    cpts['degar']['val'][5] = severe / total
+    a_s = 1 - absent / total + rand(delta)
+    a_a = absent + rand(delta)
+    m_s = 1 - mild / total + rand(delta)
+    m_a = mild + rand(delta)
+    s_s = 1 - severe / total + rand(delta)
+    s_a = severe + rand(delta)
+    cpts['degar']['val'][0] = a_s / (a_s + a_a)
+    cpts['degar']['val'][1] = a_a / (a_s + a_a)
+    cpts['degar']['val'][2] = m_s / (m_s + m_a)
+    cpts['degar']['val'][3] = m_a / (m_s + m_a)
+    cpts['degar']['val'][4] = s_s / (s_s + s_a)
+    cpts['degar']['val'][5] = s_a / (s_s + s_a)
 
     absent_0 = 0.0
     mild_0 = 0.0
@@ -287,18 +320,32 @@ def maximization(data, outcomes):
                 mild_0 += row.get(1, 0)
                 severe_0 += row.get(2, 0)
 
-    cpts['sloepnea']['val'][0] = 1 - absent_0 / total
-    cpts['sloepnea']['val'][1] = absent_0 / total
-    cpts['sloepnea']['val'][2] = 1 - absent_1 / total
-    cpts['sloepnea']['val'][3] = absent_1 / total
-    cpts['sloepnea']['val'][4] = 1 - mild_0 / total
-    cpts['sloepnea']['val'][5] = mild_0 / total
-    cpts['sloepnea']['val'][6] = 1 - mild_1 / total
-    cpts['sloepnea']['val'][7] = mild_1 / total
-    cpts['sloepnea']['val'][8] = 1 - severe_0 / total
-    cpts['sloepnea']['val'][9] = severe_0 / total
-    cpts['sloepnea']['val'][10] = 1 - severe_1 / total
-    cpts['sloepnea']['val'][11] = severe_1 / total
+    a_s0 = 1 - absent_0 / total + rand(delta)
+    a_a0 = absent_0 + rand(delta)
+    m_s0 = 1 - mild_0 / total + rand(delta)
+    m_a0 = mild_0 + rand(delta)
+    s_s0 = 1 - severe_0 / total + rand(delta)
+    s_a0 = severe_0 + rand(delta)
+
+    a_s1 = 1 - absent_1 / total + rand(delta)
+    a_a1 = absent_1 + rand(delta)
+    m_s1 = 1 - mild_1 / total + rand(delta)
+    m_a1 = mild_1 + rand(delta)
+    s_s1 = 1 - severe_1 / total + rand(delta)
+    s_a1 = severe_1 + rand(delta)
+
+    cpts['sloepnea']['val'][0] = a_s0 / (a_s0 + a_a0)
+    cpts['sloepnea']['val'][1] = a_a0 / (a_s0 + a_a0)
+    cpts['sloepnea']['val'][2] = m_s0 / (m_s0 + m_a0)
+    cpts['sloepnea']['val'][3] = m_a0 / (m_s0 + m_a0)
+    cpts['sloepnea']['val'][4] = s_s0 / (s_s0 + s_a0)
+    cpts['sloepnea']['val'][5] = s_a0 / (s_s0 + s_a0)
+    cpts['sloepnea']['val'][6] = a_s1 / (a_s1 + a_a1)
+    cpts['sloepnea']['val'][7] = a_a1 / (a_s1 + a_a1)
+    cpts['sloepnea']['val'][8] = m_s1 / (m_s1 + m_a1)
+    cpts['sloepnea']['val'][9] = m_a1 / (m_s1 + m_a1)
+    cpts['sloepnea']['val'][10] =s_s1 / (s_s1 + s_a1)
+    cpts['sloepnea']['val'][11] =s_a1 / (s_s1 + s_a1)
 
 
 def calc(delta):
@@ -325,15 +372,13 @@ def calc(delta):
     while True:
         update_parameters(cpts, parameters)
         next_s, outcomes = expectation(cpts, parameters, data)
-        print next_s
-        print cpts['dunnetts']['val']
-        maximization(data, outcomes)
+        maximization(data, outcomes, delta)
         if abs(next_s - s) < 0.1:
             break
         s = next_s
 
 
-def test(o):
+def test(o, delta):
     pt = prob_tree()
     data = load_data('testdata.txt')
     correct = 0
@@ -349,16 +394,33 @@ def test(o):
             # print 'Correct', d.f, d.d, d.s, d.t, maximum
             correct += 1
         else:
-            print 'Incorrect', d.f, d.d, d.s, d.t, maximum, ' | actual: ', d.dunnetts
-    print correct, '/', len(data)
-    print json.dumps(pt[0][0][1][0], indent=4, sort_keys=True)
+            # debug('Incorrect', d.f, d.d, d.s, d.t, maximum, ' | actual: ', d.dunnetts)
+            pass
+    debug(correct, '/', len(data))
+    return correct
+    # debug(json.dumps(pt[0][0][1][0], indent=4, sort_keys=True))
 
 
 def main():
+    results = {}
     for i in range(0, 20):
-        delta = 4.0 / 20 * i
-        o = calc(delta)
-        test(o, delta)
+        results[i] = []
+        for j in range(0, 20):
+            cpts = {
+                'dunnetts': f0.copy(),
+                'trimono': f1.copy(),
+                'foriennditis': f2.copy(),
+                'degar': f3.copy(),
+                'sloepnea': f4.copy()
+            }
+            delta = 4.0 / 20 * i
+            debug('Delta:', delta)
+            o = calc(delta)
+            success = test(o, delta)
+            results[i].append(success)
+            print('')
+    with open('results.txt', 'w') as f:
+        f.write(json.dumps(results, indent=4, sort_keys=True))
 
 if __name__ == '__main__':
     main()

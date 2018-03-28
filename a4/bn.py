@@ -33,7 +33,7 @@ def unique(l):
 
 def print_factors(factorList):
     for f in factorList:
-        print f.dtype.names, f.view((float, len(f.dtype.names)))
+        print(f.dtype.names, f.view((float, len(f.dtype.names))))
 
 
 def restrict(factor, variable, value):
