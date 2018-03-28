@@ -188,21 +188,22 @@ def expectation(cpts, parameters, data):
                 total += prob[val]
             # print prob[0], prob[1], prob[2]
             if prob[1] >= prob[0] and prob[1] >= prob[2]:
-                print 'Mild', d.f, d.d, d.s, d.t
+                # print 'Mild', d.f, d.d, d.s, d.t
                 count += 1
             elif prob[2] >= prob[0] and prob[2] >= prob[1]:
-                print 'Severe', d.f, d.d, d.s, d.t
+                # print 'Severe', d.f, d.d, d.s, d.t
                 count2 += 1
             else:
-                print 'Absent', d.f, d.d, d.s, d.t
+                pass
+                # print 'Absent', d.f, d.d, d.s, d.t
             s += total
-            for val in o:
-                prob[val] /= total
+            # for val in o:
+            #     prob[val] /= total
         else:
             for val in o:
                 prob[val] = 0
             s += o[d.dunnetts]['val']
-            prob[d.dunnetts] = 1
+            prob[d.dunnetts] = 0.000001
         # print prob
         outcomes.append(prob)
     print 'ABSENT: ', len(data) - count - count2, ' / ', len(data)
@@ -300,7 +301,7 @@ def maximization(data, outcomes):
     cpts['sloepnea']['val'][11] = severe_1 / total
 
 
-def main():
+def calc(delta):
     data = load_data('traindata.txt')
     parameters = [
         Parameter({'dunnetts': 1}, {}),
@@ -345,11 +346,19 @@ def test(o):
                 maximum = i
                 val = prob[i]['val']
         if maximum == d.dunnetts:
+            # print 'Correct', d.f, d.d, d.s, d.t, maximum
             correct += 1
+        else:
+            print 'Incorrect', d.f, d.d, d.s, d.t, maximum, ' | actual: ', d.dunnetts
     print correct, '/', len(data)
-    print json.dumps(pt[1][1][1][0], indent=4, sort_keys=True)
+    print json.dumps(pt[0][0][1][0], indent=4, sort_keys=True)
 
+
+def main():
+    for i in range(0, 20):
+        delta = 4.0 / 20 * i
+        o = calc(delta)
+        test(o, delta)
 
 if __name__ == '__main__':
-    o = main()
-    test(o)
+    main()
