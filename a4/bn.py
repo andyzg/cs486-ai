@@ -1,4 +1,5 @@
 import numpy as np
+from functools import reduce
 
 
 def fields_view(array, fields):

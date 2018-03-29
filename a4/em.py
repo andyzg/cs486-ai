@@ -148,7 +148,6 @@ def update_parameters(cpts, parameters):
 
 def prob_tree():
     v = {}
-    # tables = [f0, f1, f2, f3, f4]
     # Create a tree of all the values
     for f in values['foriennditis']:
         v[f] = {}
@@ -170,13 +169,31 @@ def prob_tree():
                                 'trimono': t,
                                 'dunnetts': dunn
                             }
-                            for col in val:
-                                table = restrict(table, col, val[col])
-                            temp[node] = table[0][0]
-                            total *= temp[node]
+                            val.pop(node)
+                            factorList = [f0.copy(), f1.copy(), f2.copy(),
+                                    f3.copy(), f4.copy()]
+                            table = inference(factorList, node, [], val)
+                            # print(table)
+                            # for col in val:
+                            #     table = restrict(table, col, val[col])
+                            if node == 'foriennditis':
+                                temp[node] = table[f]
+                            elif node == 'dunnetts':
+                                temp[node] = table[dunn]
+                            elif node == 'sloepnea':
+                                temp[node] = table[s]
+                            elif node == 'degar':
+                                temp[node] = table[d]
+                            elif node == 'trimono':
+                                temp[node] = table[t]
+                            # temp[node] = table[0][0]
+                            # print(temp[node][1])
+                            total *= temp[node][1]
                         temp['val'] = total
+                        if temp['val'] < 0:
+                            print('WTF', temp['val'], f, d, s, t, dunn)
+                        # print(f0.copy(), f1.copy(), f2.copy(), f3.copy(), f4.copy())
                         v[f][d][s][t][dunn] = temp
-                    # print 'val', v[f][d][s][t][0]['val'],v[f][d][s][t][1]['val'],v[f][d][s][t][1]['val']
     return v
 
 
@@ -199,23 +216,18 @@ def expectation(cpts, parameters, data):
                 total += prob[val]
             # print prob[0], prob[1], prob[2]
             if prob[1] >= prob[0] and prob[1] >= prob[2]:
-                # print 'Mild', d.f, d.d, d.s, d.t
                 count += 1
             elif prob[2] >= prob[0] and prob[2] >= prob[1]:
-                # print 'Severe', d.f, d.d, d.s, d.t
                 count2 += 1
             else:
                 pass
-                # print 'Absent', d.f, d.d, d.s, d.t
             s += total
-            # for val in o:
-            #     prob[val] /= total
         else:
             for val in o:
                 prob[val] = 0
-            s += o[d.dunnetts]['val']
-            prob[d.dunnetts] = 0.000001
-        # print prob
+            for val in o:
+                prob[d.dunnetts] += o[val]['val']
+            s += prob[d.dunnetts]
         outcomes.append(prob)
     # debug('ABSENT: ', len(data) - count - count2, ' / ', len(data))
     # debug('MILD: ', count, ' / ', len(data))
@@ -225,8 +237,9 @@ def expectation(cpts, parameters, data):
 
 
 def maximization(data, outcomes, delta):
+    length = len(outcomes) * 1.0
     total = len(outcomes) * 1.0
-    total = 0
+    # total = 0
 
     absent = 0.0
     mild = 0.0
@@ -237,10 +250,18 @@ def maximization(data, outcomes, delta):
         mild += row.get(1, 0)
         severe += row.get(2, 0)
     total = (absent + mild + severe)
+
+    absent *= length / total
+    mild *= length / total
+    severe *= length / total
+
     absent += rand(delta)
     mild += rand(delta)
     severe += rand(delta)
-    dunn_total = absent + mild + severe
+    # dunn_total = absent + mild + severe
+    dunn_total = length
+
+
     cpts['dunnetts']['val'][0] = absent / dunn_total
     cpts['dunnetts']['val'][1] = mild / dunn_total
     cpts['dunnetts']['val'][2] = severe / dunn_total
@@ -249,9 +270,10 @@ def maximization(data, outcomes, delta):
     # Set up trimono table
     for i, row in enumerate(outcomes):
         if data[i].t == 1:
-            trimono += (row.get(0, 0) + row.get(1, 0) + row.get(2, 0))
-    t_s = 1 - trimono / total + rand(delta)
-    t_t = rand(delta) + trimono
+            trimono += 1.0 # (row.get(0, 0) + row.get(1, 0) + row.get(2, 0))
+    trimono *= length / total
+    t_s = 1 - trimono / length + rand(delta)
+    t_t = rand(delta) + trimono / length
 
     cpts['trimono']['val'][0] = t_s / (t_t + t_s)
     cpts['trimono']['val'][1] = t_t / (t_t + t_s)
@@ -265,13 +287,17 @@ def maximization(data, outcomes, delta):
             absent += row.get(0, 0)
             mild += row.get(1, 0)
             severe += row.get(2, 0)
-    fore_total = total + delta * 2
-    a_s = 1 - absent / total + rand(delta)
-    a_a = absent + rand(delta)
-    m_s = 1 - mild / total + rand(delta)
-    m_a = mild + rand(delta)
-    s_s = 1 - severe / total + rand(delta)
-    s_a = severe + rand(delta)
+
+    absent *= length / total
+    mild *= length / total
+    severe *= length / total
+
+    a_s = 1 - absent / length + rand(delta)
+    a_a = absent / length + rand(delta)
+    m_s = 1 - mild / length + rand(delta)
+    m_a = mild / length + rand(delta)
+    s_s = 1 - severe / length + rand(delta)
+    s_a = severe / length + rand(delta)
 
     cpts['foriennditis']['val'][0] = a_s / (a_s + a_a)
     cpts['foriennditis']['val'][1] = a_a / (a_s + a_a)
@@ -289,12 +315,17 @@ def maximization(data, outcomes, delta):
             absent += row.get(0, 0)
             mild += row.get(1, 0)
             severe += row.get(2, 0)
-    a_s = 1 - absent / total + rand(delta)
-    a_a = absent + rand(delta)
-    m_s = 1 - mild / total + rand(delta)
-    m_a = mild + rand(delta)
-    s_s = 1 - severe / total + rand(delta)
-    s_a = severe + rand(delta)
+
+    absent *= length / total
+    mild *= length / total
+    severe *= length / total
+
+    a_s = 1 - absent / length + rand(delta)
+    a_a = absent / length + rand(delta)
+    m_s = 1 - mild / length + rand(delta)
+    m_a = mild / length + rand(delta)
+    s_s = 1 - severe / length + rand(delta)
+    s_a = severe / length + rand(delta)
     cpts['degar']['val'][0] = a_s / (a_s + a_a)
     cpts['degar']['val'][1] = a_a / (a_s + a_a)
     cpts['degar']['val'][2] = m_s / (m_s + m_a)
@@ -319,33 +350,45 @@ def maximization(data, outcomes, delta):
                 absent_0 += row.get(0, 0)
                 mild_0 += row.get(1, 0)
                 severe_0 += row.get(2, 0)
+        total += (row.get(0, 0) + row.get(1, 0) + row.get(2, 0))
 
-    a_s0 = 1 - absent_0 / total + rand(delta)
-    a_a0 = absent_0 + rand(delta)
-    m_s0 = 1 - mild_0 / total + rand(delta)
-    m_a0 = mild_0 + rand(delta)
-    s_s0 = 1 - severe_0 / total + rand(delta)
-    s_a0 = severe_0 + rand(delta)
+    absent_0 *= length / total
+    mild_0 *= length / total
+    severe_0 *= length / total
 
-    a_s1 = 1 - absent_1 / total + rand(delta)
-    a_a1 = absent_1 + rand(delta)
-    m_s1 = 1 - mild_1 / total + rand(delta)
-    m_a1 = mild_1 + rand(delta)
-    s_s1 = 1 - severe_1 / total + rand(delta)
-    s_a1 = severe_1 + rand(delta)
+    absent_0 *= length / total
+    mild_0 *= length / total
+    severe_0 *= length / total
+    print(severe_0, total)
 
+    a_s0 = 1 - absent_0 / length + rand(delta)
+    a_a0 = absent_0 / length + rand(delta)
+    m_s0 = 1 - mild_0 / length + rand(delta)
+    m_a0 = mild_0 / length + rand(delta)
+    s_s0 = 1 - severe_0 / length + rand(delta)
+    s_a0 = severe_0 / length + rand(delta)
+
+    a_s1 = 1 - absent_1 / length + rand(delta)
+    a_a1 = absent_1 / length + rand(delta)
+    m_s1 = 1 - mild_1 / length + rand(delta)
+    m_a1 = mild_1 / length + rand(delta)
+    s_s1 = 1 - severe_1 / length + rand(delta)
+    s_a1 = severe_1 / length + rand(delta)
+
+    print('OMG', s_s0, s_a0, severe_0, length)
     cpts['sloepnea']['val'][0] = a_s0 / (a_s0 + a_a0)
     cpts['sloepnea']['val'][1] = a_a0 / (a_s0 + a_a0)
-    cpts['sloepnea']['val'][2] = m_s0 / (m_s0 + m_a0)
-    cpts['sloepnea']['val'][3] = m_a0 / (m_s0 + m_a0)
-    cpts['sloepnea']['val'][4] = s_s0 / (s_s0 + s_a0)
-    cpts['sloepnea']['val'][5] = s_a0 / (s_s0 + s_a0)
-    cpts['sloepnea']['val'][6] = a_s1 / (a_s1 + a_a1)
-    cpts['sloepnea']['val'][7] = a_a1 / (a_s1 + a_a1)
-    cpts['sloepnea']['val'][8] = m_s1 / (m_s1 + m_a1)
-    cpts['sloepnea']['val'][9] = m_a1 / (m_s1 + m_a1)
-    cpts['sloepnea']['val'][10] =s_s1 / (s_s1 + s_a1)
-    cpts['sloepnea']['val'][11] =s_a1 / (s_s1 + s_a1)
+    cpts['sloepnea']['val'][2] = a_s1 / (a_s1 + a_a1)
+    cpts['sloepnea']['val'][3] = a_a1 / (a_s1 + a_a1)
+    cpts['sloepnea']['val'][4] = m_s0 / (m_s0 + m_a0)
+    cpts['sloepnea']['val'][5] = m_a0 / (m_s0 + m_a0)
+    cpts['sloepnea']['val'][6] = m_s1 / (m_s1 + m_a1)
+    cpts['sloepnea']['val'][7] = m_a1 / (m_s1 + m_a1)
+    cpts['sloepnea']['val'][8] = s_s0 / (s_s0 + s_a0)
+    cpts['sloepnea']['val'][9] = s_a0 / (s_s0 + s_a0)
+    cpts['sloepnea']['val'][10] = s_s1 / (s_s1 + s_a1)
+    cpts['sloepnea']['val'][11] = s_a1 / (s_s1 + s_a1)
+    print(cpts)
 
 
 def calc(delta):
@@ -376,6 +419,13 @@ def calc(delta):
         if abs(next_s - s) < 0.1:
             break
         s = next_s
+        print(s)
+        print('')
+        # print(cpts['dunnetts']['val'])
+        # print(cpts['trimono']['val'])
+        # print(cpts['foriennditis']['val'])
+        # print(cpts['degar']['val'])
+        # print(cpts['sloepnea']['val'])
 
 
 def test(o, delta):
@@ -402,10 +452,14 @@ def test(o, delta):
 
 
 def main():
+    # o = calc(0)
+    # success = test(o, 0)
+    # print(success)
+    # return
     results = {}
     for i in range(0, 20):
         results[i] = []
-        for j in range(0, 20):
+        for j in range(0, 5):
             cpts = {
                 'dunnetts': f0.copy(),
                 'trimono': f1.copy(),
@@ -424,3 +478,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+    # debug(prob_tree())

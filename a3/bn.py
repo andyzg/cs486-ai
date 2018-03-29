@@ -1,4 +1,5 @@
 import numpy as np
+from functools import reduce
 
 
 def fields_view(array, fields):
@@ -134,7 +135,6 @@ def inference(factorList, queryVariables, orderedListOfHiddenVariables, evidence
         for i, factor in enumerate(factorList):
             factorList[i] = restrict(factor, var, evidenceList[var])
 
-    # print_factors(factorList)
 
     for var in orderedListOfHiddenVariables:
         to_multiply = []
@@ -150,7 +150,6 @@ def inference(factorList, queryVariables, orderedListOfHiddenVariables, evidence
         f = sumout(product, var)
         factorList.append(f)
 
-    # print_factors(factorList)
     product = factorList[0]
     for i in range(1, len(factorList)):
         product = multiply(product, factorList[i])
@@ -167,7 +166,6 @@ a = np.array([[1,1,1,.1],
              [0,1,0,.6],
              [0,0,1,.3],
              [0,0,0,.7]])
-# print(restrict(to_structured_array(a, 'x,y,z,val'), 'x', 1))
 
 f1 = np.array([[1,1,.1],
                [1,0,.9],
