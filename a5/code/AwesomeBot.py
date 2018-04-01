@@ -15,7 +15,7 @@ class AwesomeBot(PDBot):
     def init(self):
         self.other_last_play="give 2"
     #get_play is a function that takes no arguments
-    #and returns one of the two strings "give 2" or "take 1" 
+    #and returns one of the two strings "give 2" or "take 1"
     #denoting the next play your agent will take in the game
     def get_play(self):
         #tit-for-tat always returns the other's last play
@@ -35,14 +35,14 @@ class AwesomeBot(PDBot):
 
     #make_play is a function that takes a single string argument
     #that is either "give 2" or "take 1" denoting the opponent's
-    #last play in the game    
+    #last play in the game
     def make_play(self,opponent_play):
         #store for next round
         self.other_last_play = opponent_play
         return
-        
+
 if __name__ == "__main__":
-    
+
 
     pd_agent = AwesomeBot()
 
@@ -60,7 +60,7 @@ if __name__ == "__main__":
 
         print "pd-bot's action is to: ",agent_action
 
-        
+
 
         if client_action == "give 2" or client_action == "take 1":
             pd_agent.make_play(client_action)
@@ -78,5 +78,5 @@ if __name__ == "__main__":
 
         print "your score:    ",client_score," -:",client_score*"*"
         print "pd-bots score: ",agent_score," -:",agent_score*"*"
-        
+
         iteration += 1
