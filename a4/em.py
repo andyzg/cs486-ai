@@ -1,6 +1,8 @@
 from bn import *
 import json
+import numpy as np
 import random
+import matplotlib.pyplot as plt
 
 NOT_RECORDED = -1
 NOT_PRESENT = 0
@@ -169,29 +171,13 @@ def prob_tree():
                                 'trimono': t,
                                 'dunnetts': dunn
                             }
-                            val.pop(node)
-                            factorList = [f0.copy(), f1.copy(), f2.copy(),
-                                    f3.copy(), f4.copy()]
-                            table = inference(factorList, node, [], val)
-                            # print(table)
-                            # for col in val:
-                            #     table = restrict(table, col, val[col])
-                            if node == 'foriennditis':
-                                temp[node] = table[f]
-                            elif node == 'dunnetts':
-                                temp[node] = table[dunn]
-                            elif node == 'sloepnea':
-                                temp[node] = table[s]
-                            elif node == 'degar':
-                                temp[node] = table[d]
-                            elif node == 'trimono':
-                                temp[node] = table[t]
-                            # temp[node] = table[0][0]
-                            # print(temp[node][1])
-                            total *= temp[node][1]
+                            for col in val:
+                                table = restrict(table, col, val[col])
+                            temp[node] = table[0][0]
+                            total *= temp[node]
                         temp['val'] = total
-                        if temp['val'] < 0:
-                            print('WTF', temp['val'], f, d, s, t, dunn)
+                        # if temp['val'] < 0:
+                        #     print('WTF', temp['val'], f, d, s, t, dunn)
                         # print(f0.copy(), f1.copy(), f2.copy(), f3.copy(), f4.copy())
                         v[f][d][s][t][dunn] = temp
     return v
@@ -227,6 +213,7 @@ def expectation(cpts, parameters, data):
                 prob[val] = 0
             for val in o:
                 prob[d.dunnetts] += o[val]['val']
+            prob[d.dunnetts] = 0.0001
             s += prob[d.dunnetts]
         outcomes.append(prob)
     # debug('ABSENT: ', len(data) - count - count2, ' / ', len(data))
@@ -270,7 +257,7 @@ def maximization(data, outcomes, delta):
     # Set up trimono table
     for i, row in enumerate(outcomes):
         if data[i].t == 1:
-            trimono += 1.0 # (row.get(0, 0) + row.get(1, 0) + row.get(2, 0))
+            trimono += (row.get(0, 0) + row.get(1, 0) + row.get(2, 0))
     trimono *= length / total
     t_s = 1 - trimono / length + rand(delta)
     t_t = rand(delta) + trimono / length
@@ -359,7 +346,7 @@ def maximization(data, outcomes, delta):
     absent_0 *= length / total
     mild_0 *= length / total
     severe_0 *= length / total
-    print(severe_0, total)
+    # print(severe_0, total)
 
     a_s0 = 1 - absent_0 / length + rand(delta)
     a_a0 = absent_0 / length + rand(delta)
@@ -375,7 +362,7 @@ def maximization(data, outcomes, delta):
     s_s1 = 1 - severe_1 / length + rand(delta)
     s_a1 = severe_1 / length + rand(delta)
 
-    print('OMG', s_s0, s_a0, severe_0, length)
+    # print('OMG', s_s0, s_a0, severe_0, length)
     cpts['sloepnea']['val'][0] = a_s0 / (a_s0 + a_a0)
     cpts['sloepnea']['val'][1] = a_a0 / (a_s0 + a_a0)
     cpts['sloepnea']['val'][2] = a_s1 / (a_s1 + a_a1)
@@ -388,7 +375,7 @@ def maximization(data, outcomes, delta):
     cpts['sloepnea']['val'][9] = s_a0 / (s_s0 + s_a0)
     cpts['sloepnea']['val'][10] = s_s1 / (s_s1 + s_a1)
     cpts['sloepnea']['val'][11] = s_a1 / (s_s1 + s_a1)
-    print(cpts)
+    # print(cpts)
 
 
 def calc(delta):
@@ -419,16 +406,8 @@ def calc(delta):
         if abs(next_s - s) < 0.1:
             break
         s = next_s
-        print(s)
-        print('')
-        # print(cpts['dunnetts']['val'])
-        # print(cpts['trimono']['val'])
-        # print(cpts['foriennditis']['val'])
-        # print(cpts['degar']['val'])
-        # print(cpts['sloepnea']['val'])
 
-
-def test(o, delta):
+def test(delta):
     pt = prob_tree()
     data = load_data('testdata.txt')
     correct = 0
@@ -459,7 +438,7 @@ def main():
     results = {}
     for i in range(0, 20):
         results[i] = []
-        for j in range(0, 5):
+        for j in range(0, 20):
             cpts = {
                 'dunnetts': f0.copy(),
                 'trimono': f1.copy(),
@@ -467,15 +446,143 @@ def main():
                 'degar': f3.copy(),
                 'sloepnea': f4.copy()
             }
-            delta = 4.0 / 20 * i
-            debug('Delta:', delta)
+            delta = 4.0 / 20 * i / 200
+            debug('Delta', delta)
             o = calc(delta)
-            success = test(o, delta)
+            success = test(delta)
             results[i].append(success)
+            print(success, ' / 100')
             print('')
     with open('results.txt', 'w') as f:
         f.write(json.dumps(results, indent=4, sort_keys=True))
 
+def add_delta(delta):
+    cpts['dunnetts']['val'][0] += rand(delta)
+    cpts['dunnetts']['val'][1] += rand(delta)
+    cpts['dunnetts']['val'][2] += rand(delta)
+    normalize(cpts['dunnetts'])
+
+    cpts['trimono']['val'][0] += rand(delta)
+    cpts['trimono']['val'][1] += rand(delta)
+    normalize(cpts['trimono'])
+
+    cpts['foriennditis']['val'][0] += rand(delta)
+    cpts['foriennditis']['val'][1] += rand(delta)
+    s = cpts['foriennditis']['val'][0] + cpts['foriennditis']['val'][1]
+    cpts['foriennditis']['val'][0] /= s
+    cpts['foriennditis']['val'][1] /= s
+
+    cpts['foriennditis']['val'][2] += rand(delta)
+    cpts['foriennditis']['val'][3] += rand(delta)
+    s = cpts['foriennditis']['val'][2] + cpts['foriennditis']['val'][3]
+    cpts['foriennditis']['val'][2] /= s
+    cpts['foriennditis']['val'][3] /= s
+
+    cpts['foriennditis']['val'][4] += rand(delta)
+    cpts['foriennditis']['val'][5] += rand(delta)
+    s = cpts['foriennditis']['val'][4] + cpts['foriennditis']['val'][5]
+    cpts['foriennditis']['val'][4] /= s
+    cpts['foriennditis']['val'][5] /= s
+
+
+    cpts['degar']['val'][0] += rand(delta)
+    cpts['degar']['val'][1] += rand(delta)
+    s = cpts['degar']['val'][0] + cpts['degar']['val'][1]
+    cpts['degar']['val'][0] /= s
+    cpts['degar']['val'][1] /= s
+
+    cpts['degar']['val'][2] += rand(delta)
+    cpts['degar']['val'][3] += rand(delta)
+    s = cpts['degar']['val'][2] + cpts['degar']['val'][3]
+    cpts['degar']['val'][2] /= s
+    cpts['degar']['val'][3] /= s
+
+    cpts['degar']['val'][4] += rand(delta)
+    cpts['degar']['val'][5] += rand(delta)
+    s = cpts['degar']['val'][4] + cpts['degar']['val'][5]
+    cpts['degar']['val'][4] /= s
+    cpts['degar']['val'][5] /= s
+
+
+    cpts['sloepnea']['val'][0] += rand(delta)
+    cpts['sloepnea']['val'][1] += rand(delta)
+    s = cpts['sloepnea']['val'][0] + cpts['sloepnea']['val'][1]
+    cpts['sloepnea']['val'][0] /= s
+    cpts['sloepnea']['val'][1] /= s
+
+    cpts['sloepnea']['val'][2] += rand(delta)
+    cpts['sloepnea']['val'][3] += rand(delta)
+    s = cpts['sloepnea']['val'][2] + cpts['sloepnea']['val'][3]
+    cpts['sloepnea']['val'][2] /= s
+    cpts['sloepnea']['val'][3] /= s
+
+    cpts['sloepnea']['val'][4] += rand(delta)
+    cpts['sloepnea']['val'][5] += rand(delta)
+    s = cpts['sloepnea']['val'][4] + cpts['sloepnea']['val'][5]
+    cpts['sloepnea']['val'][4] /= s
+    cpts['sloepnea']['val'][5] /= s
+
+    cpts['sloepnea']['val'][6] += rand(delta)
+    cpts['sloepnea']['val'][7] += rand(delta)
+    s = cpts['sloepnea']['val'][6] + cpts['sloepnea']['val'][7]
+    cpts['sloepnea']['val'][6] /= s
+    cpts['sloepnea']['val'][7] /= s
+
+    cpts['sloepnea']['val'][8] += rand(delta)
+    cpts['sloepnea']['val'][9] += rand(delta)
+    s = cpts['sloepnea']['val'][8] + cpts['sloepnea']['val'][9]
+    cpts['sloepnea']['val'][8] /= s
+    cpts['sloepnea']['val'][9] /= s
+
+    cpts['sloepnea']['val'][10] += rand(delta)
+    cpts['sloepnea']['val'][11] += rand(delta)
+    s = cpts['sloepnea']['val'][10] + cpts['sloepnea']['val'][11]
+    cpts['sloepnea']['val'][10] /= s
+    cpts['sloepnea']['val'][11] /= s
+
+
+
+def before_em():
+    results = {}
+    for i in range(0, 20):
+        results[i] = []
+        for j in range(0, 20):
+            delta = 4.0 / 20 * i / 200
+            cpts = {
+                'dunnetts': f0.copy(),
+                'trimono': f1.copy(),
+                'foriennditis': f2.copy(),
+                'degar': f3.copy(),
+                'sloepnea': f4.copy()
+            }
+            add_delta(delta)
+            success = test(delta)
+            print(success, ' / 100')
+            results[i].append(success)
+    with open('before.txt', 'w') as f:
+        f.write(json.dumps(results, indent=4, sort_keys=True))
+
+def plot(filename):
+    with open(filename, 'r') as f:
+        data = json.loads(f.read())
+        r = []
+        for i in range(0, 20):
+            r.append(4.0 / 20 * i)
+        m = []
+        s = []
+        for i in range(0, 20):
+            i = str(i)
+            a = np.array(data[i])
+            mean = np.mean(a)
+            stddev = np.std(a)
+            m.append(mean)
+            s.append(stddev)
+        plt.errorbar(r, m, s, linestyle='None', marker='^')
+        plt.show()
+
+
 if __name__ == '__main__':
-    main()
+    # main()
     # debug(prob_tree())
+    # before_em()
+    plot('results.txt')
