@@ -7,7 +7,7 @@ class Test(PDBot):
         pass
 
     def get_play(self):
-        if random.random() < 0.5:
+        if random.random() < 0.8:
             return 'take 1'
         return 'give 2'
 
