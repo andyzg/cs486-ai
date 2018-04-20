@@ -425,48 +425,11 @@ class AndyDufresne(PDBot):
         # A round consists of 15+-3 steps
         self.current_step = 0
 
-    def generous_play(self):
-        return random_move({
-            TAKE_1: 0.2,
-            GIVE_2: 0.8})
-
-    def greedy_play(self):
-        return random_move({
-            TAKE_1: 0.8,
-            GIVE_2: 0.2})
-
     def kr_score(self):
         return kindness_receptiveness(flat_actions(self.their_actions, self.their_current_actions),
                                       flat_actions(self.my_actions, self.my_current_actions))
 
     def get_play(self):
-        # We always want to start a turn with a give. Early actions might be
-        # weighed more heavily in their algorithms, so we want them to start
-        # being more generous to us.
-        if self.current_step == 0 and HEURISTICS_ON:
-            self.my_last_move = GIVE_2
-            return self.my_last_move
-
-        # Start being a lot more greedy near the end because there's less
-        # potential for getting the opponent to defect.
-        elif self.current_step >= 15 and HEURISTICS_ON:
-            self.my_last_move = TAKE_1
-            return self.my_last_move
-
-        # We first want to see how the opponent plays if we're generous. The
-        # only way we can do well is by leveraging other people's generosity.
-        if self.current_round == 0 and HEURISTICS_ON:
-            self.my_last_move = self.generous_play()
-            return self.my_last_move
-
-        # We want to see how greedy the opponent will be if we are greedy. Will
-        # they try to be generous and get us to give them money, or will they be
-        # more greedy?
-        if (self.current_round == 1 and HEURISTICS_ON):
-            self.my_last_move = self.greedy_play()
-            return self.my_last_move
-
-        # NON HEURISTIC LOGIC
         # Always start off a bit more generous, and end more greedy
         their_greed = self.their_greed()
         their_recent_greed = self.their_recent_greediness(5)
@@ -479,7 +442,7 @@ class AndyDufresne(PDBot):
             debug('Im too greedy recently')
             greed_score = random.random() * 0.2
 
-        elif self.my_greed() > 0.8 and random.random() < 0.5:
+        elif self.my_greed() > 0.7 and random.random() < 0.5:
             # I've been too greedy, start being more generous
             debug('Im too greedy', self.my_greed())
             greed_score = random.random() * 0.3

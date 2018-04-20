@@ -62,7 +62,7 @@ def interact():
 
     agent_score = 0
     client_score = 0
-    for j in range(0, 2):
+    for j in range(0, 1):
         pd_agent.init()
         for i in range(0, 15):
             agent_action = pd_agent.get_play()
